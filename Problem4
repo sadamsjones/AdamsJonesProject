@@ -1,0 +1,82 @@
+/*Pushbutton interfaced to the BBB. Controls a status indicator on AIO. Simulates a button sensor on a window, which is pressed when window is opened. Must use Molloy’s GPIO class.
+ *
+ *Name: ./publish_PushButton.cpp
+ *Build: ./build_PushButton.sh
+ *Executable: ./publish_PushButton
+ * */
+
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <string.h>
+#include "MQTTClient.h"
+#include "GPIO.h"
+using namespace std;
+using namespace exploringBB;//Derek Molloy 
+
+//Please replace the username, feed and token with your values
+#define ADDRESS    "tcp://io.adafruit.com"
+#define CLIENTID   "Beagle1"
+#define TOPIC      "sadamsjones/feeds/digital-input"
+#define AUTHMETHOD "sadamsjones"
+#define AUTHTOKEN  "aio_Nyma52CUy2nPBEvVbQXpDr8YyZvl"
+#define QOS        1
+#define TIMEOUT    10000L
+#define ADC_PATH   "/sys/bus/iio/devices/iio:device0/in_voltage"
+#define buttonPin 46
+
+
+int main(int argc, char* argv[]) {
+   char str_payload[100];          // Set your max message size here
+   MQTTClient client;
+   cout << "Starting Beagle board MQTT Adafruit Publish Example" << endl;
+   MQTTClient_connectOptions opts = MQTTClient_connectOptions_initializer;
+   MQTTClient_message pubmsg = MQTTClient_message_initializer;
+   MQTTClient_deliveryToken token;
+   MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+   opts.keepAliveInterval = 20;
+   opts.cleansession = 1;
+   opts.username = AUTHMETHOD;
+   opts.password = AUTHTOKEN;
+   int rc;
+   if ((rc = MQTTClient_connect(client, &opts)) != MQTTCLIENT_SUCCESS) {
+      cout << "Failed to connect, return code " << rc << endl;
+      return -1;
+   }
+    // GPIO instance for Button on GPIO 46
+   GPIO button(buttonPin);
+   int buttonVal = button.getValue(); //get the buton value using the GPIO class function
+   //if the Button is HIGH, the value is 1, then because it's on a pu pin GPIO 46 that means the button is not pressed
+   //if the Button is LOW, the value is 0, then because it's on a pu pin GPIO 46 that means the button is pressed
+   if (buttonVal == HIGH){
+   cout << "Button is: \n" << buttonVal << endl;
+   cout << "The Button is not Pressed\n" << endl;
+   }else{
+	   cout << "Button is: \n" << buttonVal << endl;
+	   cout << "The Button is Pressed\n" << endl;
+   }
+   sprintf(str_payload, "%d", buttonVal);
+   pubmsg.payload = str_payload;
+   pubmsg.payloadlen = strlen(str_payload);
+   pubmsg.qos = QOS;
+   pubmsg.retained = 0;
+   MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
+   cout << "Waiting for up to " << (int)(TIMEOUT/1000) <<
+        " seconds for publication of " << str_payload <<
+        " \non topic " << TOPIC << " for ClientID: " << CLIENTID << endl;
+   rc = MQTTClient_waitForCompletion(client, token, TIMEOUT);
+   if(rc == MQTTCLIENT_SUCCESS) {
+     cout << "Message with token " << (int)token << " delivered." << endl;
+   }
+   else {
+     cout << "Did not complete with error code: " << rc << endl;
+     // MQTTCLIENT_SUCCESS 0           MQTTCLIENT_FAILURE -1
+     // MQTTCLIENT_DISCONNECTED -3     MQTTCLIENT_MAX_MESSAGES_INFLIGHT -4
+     // MQTTCLIENT_BAD_UTF8_STRING -5  MQTTCLIENT_NULL_PARAMETER -6
+     // MQTTCLIENT_TOPICNAME_TRUNCATED -7   MQTTCLIENT_BAD_STRUCTURE -8
+     // MQTTCLIENT_BAD_QOS   -9        MQTTCLIENT_SSL_NOT_SUPPORTED   -10
+   }
+   MQTTClient_disconnect(client, 10000);
+   MQTTClient_destroy(&client);
+   return rc;
+}
