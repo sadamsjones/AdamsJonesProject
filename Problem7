@@ -1,0 +1,6 @@
+#!/bin/bash
+echo "Configuring GPIO60 as Output and GPIO46 as Input"
+echo "out" > /sys/class/gpio/gpio60/direction
+echo "in" > /sys/class/gpio/gpio46/direction
+echo "Configuring GPIO46 Pull-Up Resistor"
+config-pin p8.14 gpio_pu
